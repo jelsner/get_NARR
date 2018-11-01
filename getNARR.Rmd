@@ -113,7 +113,10 @@ sum(BigDays.sfdfT$nT)/dim(Tor.sfdf)[1] * 100
 
 Obtain the big day hulls.
 ```{r}
-BigDayHulls.sfdfT <- st_buffer(st_convex_hull(BigDays.sfdfT), dist = 100000)
+BigDayHulls.sfdfT <- st_buffer(st_convex_hull(BigDays.sfdfT), dist = 100000) 
+coords <- st_coordinates(st_centroid(BigDays.sfdfT))
+BigDayHulls.sfdfT$X <- coords[, 1]
+BigDayHulls.sfdfT$Y <- coords[, 2]
 ```
 
 Check on a map.
@@ -229,8 +232,18 @@ SST <- read.table("SST.txt", header = TRUE) %>%
   filter(Year >= 1994 & Year <= 2014)
 SST.df <- reshape2::melt(SST, id.vars = "Year")
 names(SST.df) <- c("Yr", "mo.abb", "SST")
+SST.df$Mo <- as.integer(SST.df$mo.abb)
 
-df <- left_join(df, SST.df)
+ENSO <- read.table("ENSO.txt", header = TRUE) %>%
+  filter(Year >= 1994)
+ENSO.df <- reshape2::melt(ENSO, id.vars = "Year")
+names(ENSO.df) <- c("Yr", "mo.abb", "ENSO")
+ENSO.df$Mo <- as.integer(ENSO.df$mo.abb)
+
+df$Mo <- as.integer(df$Month)
+
+df <- left_join(df, SST.df, by = c("Yr", "Mo"))
+df <- left_join(df, ENSO.df, by = c("Yr", "Mo"))
 ```
 
 Save the `df` so we can work on the models without running all the code above.
@@ -242,10 +255,12 @@ save(df, file = "df.RData")
 Trends.
 ```{r}
 df %>%
+  filter(nT >= 20) %>%
   group_by(Yr) %>%
-  summarize(AnnualAvg = mean(aVSTM)) %>%
+  summarize(AnnualAvg = mean(mCAPE * aUSTM)) %>%
 ggplot(., aes(x = Yr, y = AnnualAvg)) +
-  geom_point() + geom_line() + geom_smooth(method = lm)
+  geom_point() + geom_line() + geom_smooth() +
+  scale_y_continuous(limits = c(NA, NA))
 ```
 
 Random effects.
@@ -260,20 +275,26 @@ Models for ATE.
 ```{r}
 library(lme4)
 
-summary(lmer(aUSTM ~ Yr + (1|Month), weights = nT, data = df))
+model1 <- lmer(aUSTM ~ scale(X) + scale(Y) + ENSO + SST + Yr + (1|Month), weights = nT,  data = df)
+summary(model1)
+confint(model1, method = "Wald")
 
-model0a <- lmer(log(ATE) ~ I(mCAPE/1000) + I(mUSTM/10) + I(Yr - 2004) + (1|Month), 
+summary(lmer(log(ATE) ~ scale(X) + scale(Y) + ENSO + I(Yr - 2004) + (1|Month), 
+                weights = nT, 
+                data = df[df$nT >= 50, ]))
+
+model2 <- lmer(log(ATE) ~ scale(X) + scale(Y) + ENSO + I(mCAPE/1000) * aVSTM + I(Yr - 2004) + (1|Month), 
+                weights = nT, 
+                data = df[df$nT >= 20, ])
+summary(model2)
+AIC(model2)
+
+model3 <- lmer(log(ATE) ~ scale(X) + scale(Y) + ENSO + aUSTM * I(Yr - 2004) + (1|Month), 
                 weights = nT, 
                 data = df)
-summary(model0a)
-AIC(model0a)
+summary(model3)
 
-model0b <- lmer(log(ATE) ~ I(mCAPE/1000) + I(mCIN/100) + I(mUSTM/10) + I(Yr - 2004) + (1 |Month), 
-                weights = nT, 
-                data = df)
-summary(model0b)
-AIC(model0b)
-confint(model0b, method = "Wald")
+confint(model, method = "Wald")
 ```
 
 Models for casualties.
