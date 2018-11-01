@@ -250,7 +250,7 @@ Models for ATE.
 ```{r}
 library(lme4)
 
-summary(lmer(I(aUSTM/10) ~ I(Yr - 2004) + (1|Month), weights = nT, data = df))
+summary(lmer(I(mCAPE/10) ~ I(Yr - 2004) + (1|Month), weights = nT, data = df[df$Yr >= 2005,]))
 
 model0a <- lmer(log(ATE) ~ I(mCAPE/1000) + I(mUSTM/10) + I(Yr - 2004) + (1|Month), 
                 weights = nT, 
