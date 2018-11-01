@@ -1,6 +1,6 @@
 ---
 title: "Download NARR Data Associated With Big Tornado Days"
-author: "Zoe Schroder/James Elsner"
+author: "James Elsner"
 date: "11/1/2018"
 output: github_notebook
 editor_options:
@@ -88,7 +88,7 @@ BigDays.sfdf <- Tor.sfdf %>%
   filter(nT >= 20)
 ```
 
-Use a projection that matches the environmental data raster.
+Use a projection that matches the projection of the environmental data raster.
 ```{r}
 BigDays.sfdfT <- st_transform(BigDays.sfdf, 
                               crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
@@ -223,6 +223,16 @@ df$mUSTM <- mUSTM
 df$mVSTM <- mVSTM
 ```
 
+Get SST data.
+```{r}
+SST <- read.table("SST.txt", header = TRUE) %>%
+  filter(Year >= 1994 & Year <= 2014)
+SST.df <- reshape2::melt(SST, id.vars = "Year")
+names(SST.df) <- c("Yr", "mo.abb", "SST")
+
+df <- left_join(df, SST.df)
+```
+
 Save the `df` so we can work on the models without running all the code above.
 ```{r}
 save(df, file = "df.RData")
@@ -233,7 +243,7 @@ Trends.
 ```{r}
 df %>%
   group_by(Yr) %>%
-  summarize(AnnualAvg = mean(aUSTM)) %>%
+  summarize(AnnualAvg = mean(aVSTM)) %>%
 ggplot(., aes(x = Yr, y = AnnualAvg)) +
   geom_point() + geom_line() + geom_smooth(method = lm)
 ```
@@ -250,7 +260,7 @@ Models for ATE.
 ```{r}
 library(lme4)
 
-summary(lmer(I(mCAPE/10) ~ I(Yr - 2004) + (1|Month), weights = nT, data = df[df$Yr >= 2005,]))
+summary(lmer(aUSTM ~ Yr + (1|Month), weights = nT, data = df))
 
 model0a <- lmer(log(ATE) ~ I(mCAPE/1000) + I(mUSTM/10) + I(Yr - 2004) + (1|Month), 
                 weights = nT, 
