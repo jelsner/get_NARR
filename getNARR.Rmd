@@ -258,7 +258,7 @@ Trends.
 df %>%
   filter(nT >= 30) %>%
   group_by(Yr) %>%
-  summarize(AnnualAvg = mean(sqrt(aUSTM^2 + aVSTM^2))) %>%
+  summarize(AnnualAvg = mean(nT)) %>%
 ggplot(., aes(x = Yr, y = AnnualAvg)) +
   geom_point() + geom_line() + geom_smooth() +
   scale_y_continuous(limits = c(0, NA))
