@@ -1,5 +1,5 @@
 ---
-title: "Download NARR Data Associated With Big Tornado Days"
+title: "Download NARR Data on Big Tornado Days"
 author: "James Elsner"
 date: "11/1/2018"
 output: github_notebook
@@ -86,7 +86,8 @@ BigDays.sfdf <- Tor.sfdf %>%
   summarize(nT = n(),
             ATE = sum(ED),
             AvgATE = exp(mean(log(ED)))) %>%
-  filter(nT >= 20)
+  filter(nT >= 10)
+dim(BigDays.sfdf)
 ```
 
 Use a projection that matches the projection of the environmental data raster.
@@ -116,6 +117,8 @@ Obtain the big day hulls.
 ```{r}
 BigDayHulls.sfdfT <- st_buffer(st_convex_hull(BigDays.sfdfT), dist = 100000) 
 coords <- st_coordinates(st_centroid(BigDays.sfdfT))
+Area <- st_area(BigDayHulls.sfdfT)
+BigDayHulls.sfdfT$Area <- Area
 BigDayHulls.sfdfT$X <- coords[, 1]
 BigDayHulls.sfdfT$Y <- coords[, 2]
 ```
@@ -160,6 +163,7 @@ library(lubridate)
 df <- BigDayHulls.sfdfT %>%
   filter(cDate <= as.Date("2014-09-30")) %>%
   mutate(Yr = year(cDate),
+         Mo = month(cDate),
          Month = format(cDate, "%m"), # this is needed to preserve the leading zeros
          Day = format(cDate, "%d"), 
          YrMo = paste0(Yr, Month),
@@ -169,7 +173,7 @@ df <- BigDayHulls.sfdfT %>%
 slug <- df$slug
 ```
 
-Download the grib files. ~ 2 hours to download 300 grb files from home.
+Download the grib files. ~ 2 hours to download 300 grb file.
 ```{r, eval=FALSE}
 for(i in 1:length(slug)){
     download.file(slug[i], paste0("Archive/NARRdata", i, ".grb"), mode = "wb")
@@ -184,11 +188,13 @@ aHLCY <- numeric()
 aCIN <- numeric()
 aUSTM <- numeric()
 aVSTM <- numeric()
+aBS <- numeric()
 mCAPE <- numeric()
 mHLCY <- numeric()
 mCIN <- numeric()
 mUSTM <- numeric()
 mVSTM <- numeric()
+mBS <- numeric()
 
 for(i in 1:length(slug)){
   print(i)
@@ -200,16 +206,19 @@ for(i in 1:length(slug)){
 #  CIN.rl <- raster(rb, layer = 316)
   USTM.rl <- raster(rb, layer = 324)
   VSTM.rl <- raster(rb, layer = 325)
+  BS.rl <- sqrt(USTM.rl^2 + VSTM.rl^2)
   aCAPE <- c(aCAPE, as.numeric(extract(CAPE.rl, df[i, ], fun = mean)))
   aHLCY <- c(aHLCY, as.numeric(extract(HLCY.rl, df[i, ], fun = mean)))
   aCIN <- c(aCIN, as.numeric(extract(CIN.rl, df[i, ], fun = mean)))
   aUSTM <- c(aUSTM, as.numeric(extract(USTM.rl, df[i, ], fun = mean)))
   aVSTM <- c(aVSTM, as.numeric(extract(VSTM.rl, df[i, ], fun = mean)))
+  aBS <- c(aBS, as.numeric(extract(BS.rl, df[i, ], fun = mean)))
   mCAPE <- c(mCAPE, as.numeric(extract(CAPE.rl, df[i, ], fun = max)))
   mHLCY <- c(mHLCY, as.numeric(extract(HLCY.rl, df[i, ], fun = max)))
   mCIN <- c(mCIN, as.numeric(extract(CIN.rl, df[i, ], fun = min)))
   mUSTM <- c(mUSTM, as.numeric(extract(USTM.rl, df[i, ], fun = max)))
   mVSTM <- c(mVSTM, as.numeric(extract(VSTM.rl, df[i, ], fun = max)))
+  mBS <- c(mBS, as.numeric(extract(BS.rl, df[i, ], fun = max)))
 }
 ```
 
@@ -220,11 +229,13 @@ df$aHLCY <- aHLCY
 df$aCIN <- aCIN
 df$aUSTM <- aUSTM
 df$aVSTM <- aVSTM
+df$aBS <- aBS
 df$mCAPE <- mCAPE
 df$mHLCY <- mHLCY
 df$mCIN <- mCIN
 df$mUSTM <- mUSTM
 df$mVSTM <- mVSTM
+df$mBS <- mBS
 ```
 
 Get SST data.
@@ -241,7 +252,7 @@ ENSO.df <- reshape2::melt(ENSO, id.vars = "Year")
 names(ENSO.df) <- c("Yr", "mo.abb", "ENSO")
 ENSO.df$Mo <- as.integer(ENSO.df$mo.abb)
 
-df$Mo <- as.integer(df$Month)
+# df$Mo <- as.integer(df$Month)
 
 df <- left_join(df, SST.df, by = c("Yr", "Mo"))
 df <- left_join(df, ENSO.df, by = c("Yr", "Mo"))
