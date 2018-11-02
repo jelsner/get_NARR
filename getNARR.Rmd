@@ -84,7 +84,8 @@ Determine big days.
 BigDays.sfdf <- Tor.sfdf %>%
   group_by(cDate) %>%
   summarize(nT = n(),
-            ATE = sum(ED)) %>%
+            ATE = sum(ED),
+            AvgATE = exp(mean(log(ED)))) %>%
   filter(nT >= 20)
 ```
 
@@ -255,12 +256,12 @@ save(df, file = "df.RData")
 Trends.
 ```{r}
 df %>%
-  filter(nT >= 20) %>%
+  filter(nT >= 30) %>%
   group_by(Yr) %>%
-  summarize(AnnualAvg = mean(mCAPE * aUSTM)) %>%
+  summarize(AnnualAvg = mean(sqrt(aUSTM^2 + aVSTM^2))) %>%
 ggplot(., aes(x = Yr, y = AnnualAvg)) +
   geom_point() + geom_line() + geom_smooth() +
-  scale_y_continuous(limits = c(NA, NA))
+  scale_y_continuous(limits = c(0, NA))
 ```
 
 Random effects.
@@ -279,13 +280,13 @@ model1 <- lmer(aUSTM ~ scale(X) + scale(Y) + ENSO + SST + Yr + (1|Month), weight
 summary(model1)
 confint(model1, method = "Wald")
 
-summary(lmer(log(ATE) ~ scale(X) + scale(Y) + ENSO + I(Yr - 2004) + (1|Month), 
-                weights = nT, 
-                data = df[df$nT >= 50, ]))
+summary(lmer(log(AvgATE) ~ scale(X) + nT + I(Yr > 2007) + I(Yr - 2004) + (1|Month), 
+             weights = nT, 
+             data = df[df$nT >= 20, ]))
 
-model2 <- lmer(log(ATE) ~ scale(X) + scale(Y) + ENSO + I(mCAPE/1000) * aVSTM + I(Yr - 2004) + (1|Month), 
-                weights = nT, 
-                data = df[df$nT >= 20, ])
+summary(lmer(log(AvgATE) ~ scale(X) + nT + I(mCAPE/1000) * I(sqrt(aVSTM^2 + aUSTM^2)) + I(Yr > 2007) + I(Yr - 2004) + (1|Month),
+             weights = nT, 
+             data = df[df$nT >= 20, ]))
 summary(model2)
 AIC(model2)
 
