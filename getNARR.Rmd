@@ -264,14 +264,14 @@ save(df, file = "df.RData")
 #load("df.RData")
 ```
 
-Trends.
+Trends. Leave off 2014 because there is no environmental data after September 2014.
 ```{r}
 df %>%
-  filter(nT >= 30) %>%
+  filter(nT >= 10, Yr < 2014) %>%
   group_by(Yr) %>%
-  summarize(AnnualAvg = mean(nT)) %>%
+  summarize(AnnualAvg = mean(aHLCY, na.rm = TRUE)) %>%
 ggplot(., aes(x = Yr, y = AnnualAvg)) +
-  geom_point() + geom_line() + geom_smooth() +
+  geom_point() + geom_line() + geom_smooth(method = lm) +
   scale_y_continuous(limits = c(0, NA))
 ```
 
@@ -283,7 +283,7 @@ df %>%
             nT = sum(nT))
 ```
 
-Models for ATE.
+Models for ATE. Remove row 332 since HLCY is missing for that outbreak.
 ```{r}
 library(lme4)
 
@@ -291,23 +291,39 @@ model1 <- lmer(aUSTM ~ scale(X) + scale(Y) + ENSO + SST + Yr + (1|Month), weight
 summary(model1)
 confint(model1, method = "Wald")
 
-summary(lmer(log(AvgATE) ~ scale(X) + nT + I(Yr > 2007) + I(Yr - 2004) + (1|Month), 
+summary(lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month), 
              weights = nT, 
-             data = df[df$nT >= 20, ]))
+             data = df[-332,]))
 
-summary(lmer(log(AvgATE) ~ scale(X) + nT + I(mCAPE/1000) * I(sqrt(aVSTM^2 + aUSTM^2)) + I(Yr > 2007) + I(Yr - 2004) + (1|Month),
+#Trend .0551
+
+summary(lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month) + I(aCAPE/1000) * I(aHLCY/10) + I(aCIN/10),
              weights = nT, 
-             data = df[df$nT >= 20, ]))
-summary(model2)
-AIC(model2)
+             data = df[-332,]))
+#Trend .0417
 
-model3 <- lmer(log(ATE) ~ scale(X) + scale(Y) + ENSO + aUSTM * I(Yr - 2004) + (1|Month), 
-                weights = nT, 
-                data = df)
-summary(model3)
-
-confint(model, method = "Wald")
+#confint(model, method = "Wald")
 ```
+
+Plots for the interaction term.
+```{r}
+library(interplot)
+df$aCAPE2 <- df$aCAPE/1000
+df$aHLCY2 <- df$aHLCY/10
+model <- lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month) + aCAPE2 * aHLCY2 + I(aCIN/10),
+             weights = nT, 
+             data = df[-332,])
+
+interplot(m = model, var1 = "aCAPE2", var2 = "aHLCY2", hist = TRUE) +
+    scale_x_continuous(breaks = c(0, 20, 40, 60), labels = c(0, 200, 400, 600)) +
+    scale_y_continuous() +
+    xlab(expression(paste("Storm Relative Helicity [J/kg]"))) +
+    ylab("CAPE's Effect on ATE [%/1000 J/kg]") +
+    theme_minimal()
+```
+
+
+
 
 Models for casualties.
 ```{r}
