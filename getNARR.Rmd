@@ -17,6 +17,7 @@ library(sf)
 library(tmap)
 library(USAboundaries)
 library(rgeos)
+library(lme4)
 ```
 
 The newest GIS shapefile contains missing geometries for more than 30% of the tornadoes. The number of missing geometries is highest after 1995. Instead here we use the csv file from https://www.spc.noaa.gov/wcm/#data  Use the start lon/lat and create a `sp` object then convert to `sf`. Set the coordinate reference system (crs) to ESPG 4326.
@@ -181,6 +182,11 @@ for(i in 1:length(slug)){
 ```
 
 Read the grib files as raster bricks and assign the CAPE and helicity variables to separate raster layers. Extract the average (and extreme) environmental values within each of the big days in large groups hulls. https://nomads.ncdc.noaa.gov/data/narr/201104/20110427/narr-a_221_20110427_0000_000.inv
+
+323:HLCY:3000-0 m above gnd:kpds=190,106,7680:anl:winds are N/S:"Storm relative helicity [m^2/s^2] [J/kg]
+324:USTM:6000-0 m above gnd:kpds=196,106,15360:anl:winds are N/S:"u-component of storm motion [m/s]
+325:VSTM:6000-0 m above gnd:kpds=197,106,15360:anl:winds are N/S:"v-component of storm motion [m/s]
+
 ```{r}
 library(raster)
 aCAPE <- numeric()
@@ -189,6 +195,7 @@ aCIN <- numeric()
 aUSTM <- numeric()
 aVSTM <- numeric()
 aBS <- numeric()
+aRATIO <- numeric()
 mCAPE <- numeric()
 mHLCY <- numeric()
 mCIN <- numeric()
@@ -266,14 +273,35 @@ save(df, file = "df.RData")
 
 Trends. Leave off 2014 because there is no environmental data after September 2014.
 ```{r}
-df %>%
+p1 <- df %>%
   filter(nT >= 10, Yr < 2014) %>%
   group_by(Yr) %>%
   summarize(AnnualAvg = mean(aHLCY, na.rm = TRUE)) %>%
 ggplot(., aes(x = Yr, y = AnnualAvg)) +
-  geom_point() + geom_line() + geom_smooth(method = lm) +
-  scale_y_continuous(limits = c(0, NA))
+  geom_point() + geom_line() + geom_smooth(method = lm, color = "black", size = .35) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(1994, 2013, 4)) +
+  ylab("Storm Relative Helicity\n [J/kg]") + xlab("Year") +
+  theme_minimal() +
+  ggtitle("A")
+
+p2 <- df %>%
+  filter(nT >= 10, Yr < 2014) %>%
+  group_by(Yr) %>%
+  summarize(AnnualAvg = mean(aCIN, na.rm = TRUE)) %>%
+ggplot(., aes(x = Yr, y = -AnnualAvg)) +
+  geom_point() + geom_line() + geom_smooth(method = lm, color = "black", size = .35) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(1994, 2013, 4)) +
+  ylab("Convective Inhibition\n [J/kg]") + xlab("Year") +
+  theme_minimal() +
+  ggtitle("B")
+
+library(patchwork)
+p2/p1
 ```
+
+Increasing CIN helps explain the increasing percentage of all tornadoes occurring on days with many tornadoes (Elsner et al. 2014). Increasing SRH is consistent with increasing shear
 
 Random effects.
 ```{r}
@@ -285,101 +313,48 @@ df %>%
 
 Models for ATE. Remove row 332 since HLCY is missing for that outbreak.
 ```{r}
-library(lme4)
-
-model1 <- lmer(aUSTM ~ scale(X) + scale(Y) + ENSO + SST + Yr + (1|Month), weights = nT,  data = df)
-summary(model1)
-confint(model1, method = "Wald")
-
 summary(lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month), 
              weights = nT, 
              data = df[-332,]))
 
-#Trend .0551
+#Trend .0552
 
 summary(lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month) + I(aCAPE/1000) * I(aHLCY/10) + I(aCIN/10),
              weights = nT, 
              data = df[-332,]))
 #Trend .0417
-
-#confint(model, method = "Wald")
 ```
 
-Plots for the interaction term.
+Plot the interaction term.
 ```{r}
 library(interplot)
+
 df$aCAPE2 <- df$aCAPE/1000
 df$aHLCY2 <- df$aHLCY/10
-model <- lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month) + aCAPE2 * aHLCY2 + I(aCIN/10),
+df$aCIN2 <- df$aCIN/10
+model <- lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month) + 
+                aCAPE2 * aHLCY2 + aCIN,
              weights = nT, 
              data = df[-332,])
 
-interplot(m = model, var1 = "aCAPE2", var2 = "aHLCY2", hist = TRUE) +
-    scale_x_continuous(breaks = c(0, 20, 40, 60), labels = c(0, 200, 400, 600)) +
-    scale_y_continuous() +
+labs <- c(0, 25, 50, 100)
+y <- exp(labs/100) - 1
+p3 <- interplot(m = model, var1 = "aCAPE2", var2 = "aHLCY2", hist = TRUE, ci = .95) +
+    scale_x_continuous(limits = c(0, 35), breaks = seq(0, 35, 5), labels = seq(0, 350, 50)) +
+    scale_y_continuous(breaks = y, 
+                       labels = paste0(labs, "%"),
+                       limits = c(-.5, 2)) +
     xlab(expression(paste("Storm Relative Helicity [J/kg]"))) +
-    ylab("CAPE's Effect on ATE [%/1000 J/kg]") +
-    theme_minimal()
+    ylab("CAPE's Effect on Tornado Power\n [% Increase/1000 J/kg]") +
+  geom_hline(yintercept = 0, color = "black") +
+    theme_minimal() +
+  ggtitle("C")
+p3$labels$caption = ""
+
+(p1 + p2)/p3
 ```
 
+We conjecture that at least a portion of the upward trend in tornado power is related to long-term changes in regional enviroments associated with severe thunderstorms. Modeling studies project increases in convective available energy (CAPE) with a warmer climate (14, 15), and we (5) have hypothesized that climate change and increases in CAPE could already be leading to more active areas of severe convection on days with tornadoes.
 
-
-
-Models for casualties.
-```{r}
-model1b <- lmer(log(GroupDayCas + 1) ~ I(mCAPE/1000) + I(mUSTM/10) + (1|Mo), 
-                weights = nT, 
-                data = df)
-summary(model1b)
-```
-
-Observed versus predicted.
-```{r}
-df$preED <- exp(predict(model0b))
-cor(df$preED, df$GroupDayTotalED)
-df$preCas <- exp(predict(model1b)) - 1
-```
-
-Energy dissipation
-```{r}
-ggplot(df, aes(x = GroupDayTotalED/10^9, y = preED/10^9, color = log10(GroupDayCas + 1))) +
-  scale_color_continuous(guide=FALSE) +
-         geom_point() + geom_smooth(method = lm, color = "red", se = FALSE) +
-         geom_abline(slope = 1) +
-         scale_x_log10(limits = c(1, 300000), breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c("1", "10", "100", "1000", "10,000", "100,000")) +
-         scale_y_log10(limits = c(1, 300000), breaks = c(1, 10, 100, 1000, 10000, 100000), labels = c("1", "10", "100", "1000", "10,000", "100,000")) +
-  ylab("Predicted Accumulated Tornado Energy [GW]") + xlab("Accumulated Tornado Energy [GW]") +
-  theme_minimal()
-```
-
-Casualties
-```{r}
-ggplot(df[df$GroupDayCas > 0, ], aes(x = GroupDayCas, y = preCas)) +
-  scale_color_continuous(guide=FALSE) +
-         geom_point() + geom_smooth(method = lm, color = "red", se = FALSE) +
-         geom_abline(slope = 1) +
-         scale_x_log10() +
-         scale_y_log10() +
-  ylab("Predicted Casualties") + xlab("Observed Casualties") +
-  theme_minimal()
-```
-
-Plots for the interaction term.
-```{r}
-library(interplot)
-df$mCAPE2 <- df$mCAPE/1000
-df$mCIN2 <- df$mCIN/100
-model0bX <- lmer(log(GroupDayTotalED) ~ mCAPE2 * mCIN2 + I(mUSTM/10) + I(Yr - 2004) + (1|Mo), 
-                weights = nT, 
-                data = df)
-y <- c(0, 50, 100, 150, 200)
-interplot(m = model0bX, var1 = "mCAPE2", var2 = "mCIN2", hist = TRUE, xmin = -3) +
-    scale_x_continuous(breaks = seq(-5, 0, 1), 
-                       labels = 100 * seq(-5, 0, 1)) +
-    scale_y_continuous(breaks = log(y/100 + 1), 
-                       labels = y) +
-    xlab(expression(paste("CIN [J/kg]"))) +
-    ylab("CAPE's Effect on ATE [%/1000 J/kg]") +
-    theme_minimal()
-```
+Here we examine how CAPE, convective inhibition (CIN), and storm relative helicity (SRH) are related to the trend in tornado power. We use gridded reanalysis data at 1800 UTC on days with at least ten tornadoes (outbreaks). We spatially average values separately for each of the three environmental variables over all grids within the convex hull defined by the tornado genesis locations for that day. Averages over all outbreak days by year show upward trends in SRH (as noted in (Tippett et al. 2016) and SRH (Fig.~\ref{XX}[A and B]). We include the variables in models for average tornado energy (power averaged over all tornadoes in the outbreak and scaled by the area of the hull) and find the best model when CAPE and SRH are combined as an interaction term. In other words CAPE's effect on tornado power increases significantly with increasing SRH (Fig.~\ref{XX}[C]). Importantly the magnitude of the trend in a model with the environmental variables is 20\% lower compared with the magnitude of the trend in a model without the variables. Thus we conclude that increasing tornado power is occurring in environments where the effect of CAPE is increasing due to increases in SRH.
 
