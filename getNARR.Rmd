@@ -239,6 +239,7 @@ df$aCIN <- aCIN
 df$aUSTM <- aUSTM
 df$aVSTM <- aVSTM
 df$aBS <- aBS
+df$aRATIO <- aRATIO
 df$mCAPE <- mCAPE
 df$mHLCY <- mHLCY
 df$mCIN <- mCIN
@@ -325,6 +326,12 @@ summary(lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (
              weights = nT, 
              data = df[-332,]))
 #Trend .0417
+(.0552 - .0417)/.0552
+
+modelX <- lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + (1 + I(Yr - 2004)|Month) + I(aCAPE/1000) * I(aHLCY/10) + I(aCIN/10),
+             weights = nT, 
+             data = df[-332,])
+
 ```
 
 Plot the interaction term.
@@ -358,5 +365,5 @@ p3$labels$caption = ""
 
 We conjecture that at least a portion of the upward trend in tornado power is related to long-term changes in regional enviroments associated with severe thunderstorms. Modeling studies project increases in convective available energy (CAPE) with a warmer climate (14, 15), and we (5) have hypothesized that climate change and increases in CAPE could already be leading to more active areas of severe convection on days with tornadoes.
 
-Here we examine how CAPE, convective inhibition (CIN), and storm relative helicity (SRH) are related to the trend in tornado power. We use gridded reanalysis data at 1800 UTC on days with at least ten tornadoes (outbreaks). We spatially average values separately for each of the three environmental variables over all grids within the convex hull defined by the tornado genesis locations for that day. Averages over all outbreak days by year show upward trends in SRH (as noted in (Tippett et al. 2016) and SRH (Fig.~\ref{XX}[A and B]). We include the variables in models for average tornado energy (power averaged over all tornadoes in the outbreak and scaled by the area of the hull) and find the best model when CAPE and SRH are combined as an interaction term. In other words CAPE's effect on tornado power increases significantly with increasing SRH (Fig.~\ref{XX}[C]). Importantly the magnitude of the trend in a model with the environmental variables is 20\% lower compared with the magnitude of the trend in a model without the variables. Thus we conclude that increasing tornado power is occurring in environments where the effect of CAPE is increasing due to increases in SRH.
+Here we examine how CAPE, convective inhibition (CIN), and storm relative helicity (SRH) are related to the trend in tornado power. We use gridded reanalysis data at 1800 UTC on days with at least ten tornadoes (outbreaks). We spatially average values separately for each of the three environmental variables over all grids within the convex hull defined by the tornado genesis locations for that day. Averages over all outbreak days by year show upward trends in SRH (as noted in (Tippett et al. 2016) and SRH (Fig.~\ref{XX}[A and B]). We include the variables in models for average tornado energy (power averaged over all tornadoes in the outbreak and scaled by the area of the hull) and find the best model when CAPE and SRH are combined as an interaction term. In other words CAPE's effect on tornado power increases significantly with increasing SRH (Fig.~\ref{XX}[C]). Importantly the magnitude of the trend in a model with the environmental variables is 20\% lower compared with the magnitude of the trend in a model without the variables. Thus we conclude that increasing tornado power is occurring in environments where the effect of CAPE on power is rising with increasing SRH.
 
