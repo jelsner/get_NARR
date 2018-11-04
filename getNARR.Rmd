@@ -281,27 +281,24 @@ p1 <- df %>%
   group_by(Yr) %>%
   summarize(AnnualAvg = mean(aHLCY, na.rm = TRUE)) %>%
 ggplot(., aes(x = Yr, y = AnnualAvg)) +
-  geom_point() + geom_line() + geom_smooth(method = lm, color = "black", size = .35) +
+  geom_point() + geom_smooth(method = lm, color = "black", size = .35) +
   scale_y_continuous(limits = c(0, NA)) +
   scale_x_continuous(breaks = seq(1994, 2013, 4)) +
   ylab("Storm Relative Helicity\n [J/kg]") + xlab("Year") +
   theme_minimal() +
-  ggtitle("A")
+  ggtitle("B")
 
 p2 <- df %>%
   filter(nT >= 10, Yr < 2014) %>%
   group_by(Yr) %>%
   summarize(AnnualAvg = mean(aCIN, na.rm = TRUE)) %>%
 ggplot(., aes(x = Yr, y = -AnnualAvg)) +
-  geom_point() + geom_line() + geom_smooth(method = lm, color = "black", size = .35) +
+  geom_point()  + geom_smooth(method = lm, color = "black", size = .35) +
   scale_y_continuous(limits = c(0, NA)) +
   scale_x_continuous(breaks = seq(1994, 2013, 4)) +
   ylab("Convective Inhibition\n [J/kg]") + xlab("Year") +
   theme_minimal() +
-  ggtitle("B")
-
-library(patchwork)
-p2/p1
+  ggtitle("C")
 ```
 
 Increasing CIN helps explain the increasing percentage of all tornadoes occurring on days with many tornadoes (Elsner et al. 2014). Increasing SRH is consistent with increasing shear
@@ -355,12 +352,13 @@ p3 <- interplot(m = model, var1 = "aCAPE2", var2 = "aHLCY2", hist = TRUE, ci = .
                        limits = c(-.5, 2)) +
     xlab(expression(paste("Storm Relative Helicity [J/kg]"))) +
     ylab("CAPE's Effect on Tornado Power\n [% Increase/1000 J/kg]") +
-  geom_hline(yintercept = 0, color = "black") +
+  geom_hline(yintercept = 0, color = "gray") +
     theme_minimal() +
-  ggtitle("C")
+  ggtitle("A")
 p3$labels$caption = ""
 
-(p1 + p2)/p3
+library(patchwork)
+p3 + (p1/p2)
 ```
 
 We conjecture that at least a portion of the upward trend in tornado power is related to long-term changes in regional enviroments associated with severe thunderstorms. Modeling studies project increases in convective available energy (CAPE) with a warmer climate (14, 15), and we (5) have hypothesized that climate change and increases in CAPE could already be leading to more active areas of severe convection on days with tornadoes.
