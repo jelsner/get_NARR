@@ -319,13 +319,15 @@ summary(lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (
 
 #Trend .0552
 
-summary(lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month) + I(aCAPE/1000) * I(aHLCY/10) + I(aCIN/10),
+summary(lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + I(Yr - 2004) + (1|Month) + 
+               I(aCAPE/1000),
              weights = nT, 
              data = df[-332,]))
 #Trend .0417
 (.0552 - .0417)/.0552
 
-modelX <- lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + (1 + I(Yr - 2004)|Month) + I(aCAPE/1000) * I(aHLCY/10) + I(aCIN/10),
+modelX <- lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + (1 + I(Yr - 2004)|Month) + 
+                 I(aCAPE/1000) * I(aHLCY/10) + I(aCIN/10),
              weights = nT, 
              data = df[-332,])
 
