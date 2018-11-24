@@ -30,7 +30,7 @@ Tor.sfdf <- st_as_sf(Tor.spdf)
 st_crs(Tor.sfdf) <- 4326
 ```
 
-Remove tornadoes in Hawaii, Alaska, and Puerto Rico and those occurring before 1994. That year marks the beginning of comprehensive WSR-88D radar. For missing EF ratings use the modification rules (if/else) defined here: https://www.spc.noaa.gov/wcm/OneTor_F-scale-modifications.pdf
+Remove tornadoes occurring in Hawaii, Alaska, and Puerto Rico and those occurring before 1994. That year marks the beginning of comprehensive WSR-88D radar coverage. For missing EF ratings use the modification rules (if/else) defined here: https://www.spc.noaa.gov/wcm/OneTor_F-scale-modifications.pdf
 ```{r}
 Tor.sfdf <- Tor.sfdf %>%
   filter(yr >= 1994,
@@ -156,7 +156,7 @@ ggplot(BigDays.sfdfT, aes(log10(ATE))) +
   theme_minimal()
 ```
 
-## Part 2: Environmental data
+## Part 2: Environmental data on big days
 
 Get environmental data at 18Z (2p local) on the convective day. Set up a vector of URLs as character strings. Data are not available after September 30, 2014.
 ```{r}
@@ -363,7 +363,57 @@ library(patchwork)
 p3 + (p1/p2)
 ```
 
-We conjecture that at least a portion of the upward trend in tornado power is related to long-term changes in regional enviroments associated with severe thunderstorms. Modeling studies project increases in convective available energy (CAPE) with a warmer climate (14, 15), and we (5) have hypothesized that climate change and increases in CAPE could already be leading to more active areas of severe convection on days with tornadoes.
+## Part 3: Environmental data on randomly chosen days with fewer than 10 tornadoes
 
-Here we examine how CAPE, convective inhibition (CIN), and storm relative helicity (SRH) are related to the trend in tornado power. We use gridded reanalysis data at 1800 UTC on days with at least ten tornadoes (outbreaks). We spatially average values separately for each of the three environmental variables over all grids within the convex hull defined by the tornado genesis locations for that day. Averages over all outbreak days by year show upward trends in SRH (as noted in (Tippett et al. 2016) and SRH (Fig.~\ref{XX}[A and B]). We include the variables in models for average tornado energy (power averaged over all tornadoes in the outbreak and scaled by the area of the hull) and find the best model when CAPE and SRH are combined as an interaction term. In other words CAPE's effect on tornado power increases significantly with increasing SRH (Fig.~\ref{XX}[C]). Importantly the magnitude of the trend in a model with the environmental variables is 20\% lower compared with the magnitude of the trend in a model without the variables. Thus we conclude that increasing tornado power is occurring in environments where the effect of CAPE on power is rising with increasing SRH.
+Choose random days not in the list of big days. Start with a sequence of all days in the interval. Remove big days from the sequence. Then use the frequency of big day months as the weights.
+```{r}
+AllDates <- seq(ymd('1994-01-01'),
+               ymd('2014-09-30'),
+               by = '1 day')
+Months <- month(BigDays.sfdfT$cDate)
+Weights <- as.numeric(table(Months))/length(Months)
+```
+
+Randomly choose months with a frequency that matches the frequency of big days. Randomly choose years and days then combine to make a date object and remove big day dates.
+```{r}
+rMo <- sample.int(n = 12, 
+                  size = 1000, 
+                  replace = TRUE, 
+                  prob = Weights)
+rYr <- sample(x = seq(1994, 2013), 
+              size = 1000, 
+              replace = TRUE)
+rDa <- sample.int(n = 28,
+                  size = 1000,
+                  replace = TRUE)
+rDates <- as.Date(paste0(rYr, "-", rMo, "-", rDa))
+rDates <- rDates[!rDates %in% BigDays.sfdfT$cDate]
+```
+
+Get the url slugs for these non big days.
+```{r}
+Yr <- year(rDates)
+Month <- format(rDates, "%m")
+Day <- format(rDates, "%d")
+YrMo <- paste0(Yr, Month)
+YrMoDa <- paste0(YrMo, Day)
+slug2 <- paste0(YrMo, "/", YrMoDa, "/", "narr-a_221_", YrMoDa, "_1800_000.grb")
+slug <- paste0("https://nomads.ncdc.noaa.gov/data/narr/", slug2)
+```
+
+Get usa boundary as a simple feature.
+```{r}
+usBoundary <- us_states(resolution = "low") %>%
+  filter(!stusps %in% c("AK", "HI", "PR", "DC")) %>%
+  st_union() %>%
+  st_transform(crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+```
+
+Download the 18Z convective variables from NARR.
+```{r}
+for(i in 1:length(slug)){
+    download.file(slug[i], paste0("Archive2/NARRdata", i, ".grb"), mode = "wb")
+    }
+```
+
 
