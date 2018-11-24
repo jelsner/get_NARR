@@ -330,7 +330,6 @@ modelX <- lmer(log(AvgATE/Area) ~ scale(X) + nT + I(Yr >= 2007) + (1 + I(Yr - 20
                  I(aCAPE/1000) * I(aHLCY/10) + I(aCIN/10),
              weights = nT, 
              data = df[-332,])
-
 ```
 
 Plot the interaction term.
