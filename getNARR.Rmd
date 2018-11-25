@@ -406,6 +406,17 @@ usBoundary <- us_states(resolution = "low") %>%
   filter(!stusps %in% c("AK", "HI", "PR", "DC")) %>%
   st_union() %>%
   st_transform(crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+usB <- as(usBoundary, "Spatial")
+```
+
+Get tornado alley as a simple feature. Nebraska, Kansas, Oklahoma, Texas, Arkansas, Missouri, Illinois, Indiana, Ohio, Kentucky, Tennessee, Louisiana, Mississippi, Alabama, Georgia.
+```{r}
+usTA <- us_states(resolution = "low") %>%
+  filter(stusps %in% c("NE", "KS", "OK", "TX", "AR", "MO", "IL", "IA",
+                       "IN", "OH", "KY", "TN", "LA", "MS", "AL", "GA" )) %>%
+  st_union() %>%
+  st_transform(crs = "+proj=lcc +lat_1=50 +lat_2=50 +lat_0=50 +lon_0=-107 +x_0=0 +y_0=0 +a=6371200 +b=6371200 +units=m +no_defs")
+usB <- as(usBoundary, "Spatial")
 ```
 
 Download the 18Z convective variables from NARR.
@@ -415,4 +426,129 @@ for(i in 1:length(slug)){
     }
 ```
 
+Import grids and extract environmental variables over the US.
+```{r}
+library(raster)
+aCAPE <- numeric()
+aHLCY <- numeric()
+aCIN <- numeric()
+aUSTM <- numeric()
+aVSTM <- numeric()
+aBS <- numeric()
+mCAPE <- numeric()
+mHLCY <- numeric()
+mCIN <- numeric()
+mUSTM <- numeric()
+mVSTM <- numeric()
+mBS <- numeric()
+
+for(i in 1:length(slug)){
+  print(i)
+  rb <- brick(paste0("Archive2/NARRdata", i, ".grb"))
+  CAPE.rl <- raster(rb, layer = 375)
+  CIN.rl <- raster(rb, layer = 376)
+  HLCY.rl <- raster(rb, layer = 323)
+  USTM.rl <- raster(rb, layer = 324)
+  VSTM.rl <- raster(rb, layer = 325)
+  BS.rl <- sqrt(USTM.rl^2 + VSTM.rl^2)
+  aCAPE <- c(aCAPE, as.numeric(extract(CAPE.rl, usB, fun = mean)))
+  aHLCY <- c(aHLCY, as.numeric(extract(HLCY.rl, usB, fun = mean)))
+  aCIN <- c(aCIN, as.numeric(extract(CIN.rl, usB, fun = mean)))
+  aUSTM <- c(aUSTM, as.numeric(extract(USTM.rl, usB, fun = mean)))
+  aVSTM <- c(aVSTM, as.numeric(extract(VSTM.rl, usB, fun = mean)))
+  aBS <- c(aBS, as.numeric(extract(BS.rl, usB, fun = mean)))
+  mCAPE <- c(mCAPE, as.numeric(extract(CAPE.rl, usB, fun = max)))
+  mHLCY <- c(mHLCY, as.numeric(extract(HLCY.rl, usB, fun = max)))
+  mCIN <- c(mCIN, as.numeric(extract(CIN.rl, usB, fun = min)))
+  mUSTM <- c(mUSTM, as.numeric(extract(USTM.rl, usB, fun = max)))
+  mVSTM <- c(mVSTM, as.numeric(extract(VSTM.rl, usB, fun = max)))
+  mBS <- c(mBS, as.numeric(extract(BS.rl, usB, fun = max)))
+}
+```
+
+```{r}
+dfTA <- data.frame(Yr, rDates, aCAPE, aCIN = -aCIN, aHLCY, aUSTM, aVSTM, aBS,
+                              mCAPE, mCIN = -mCIN, mHLCY, mUSTM, mVSTM, mBS)
+```
+
+Annual trends.
+```{r}
+p1 <- dfTA %>%
+  group_by(Yr) %>%
+  summarize(AnnualAvg = mean(mCAPE)) %>%
+ggplot(., aes(x = Yr, y = AnnualAvg)) +
+  geom_point() + geom_smooth(method = lm, color = "black", size = .35) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(1994, 2013, 4)) +
+  ylab("CAPE\n [J/kg]") + xlab("Year") +
+  theme_minimal() +
+  ggtitle("A")
+
+p2 <- dfTA%>%
+  group_by(Yr) %>%
+  summarize(AnnualAvg = mean(mCIN)) %>%
+ggplot(., aes(x = Yr, y = AnnualAvg)) +
+  geom_point() + geom_smooth(method = lm, color = "black", size = .35) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(1994, 2013, 4)) +
+  ylab("CIN\n [J/kg]") + xlab("Year") +
+  theme_minimal() +
+  ggtitle("B")
+
+p3 <- dfTA %>%
+  group_by(Yr) %>%
+  summarize(AnnualAvg = mean(mBS)) %>%
+ggplot(., aes(x = Yr, y = AnnualAvg)) +
+  geom_point() + geom_smooth(method = lm, color = "black", size = .35) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(1994, 2013, 4)) +
+  ylab("Bulk Shear\n [m/s]") + xlab("Year") +
+  theme_minimal() +
+  ggtitle("C")
+
+p4 <- dfTA %>%
+  group_by(Yr) %>%
+  summarize(AnnualAvg = mean(mUSTM)) %>%
+ggplot(., aes(x = Yr, y = AnnualAvg)) +
+  geom_point() + geom_smooth(method = lm, color = "black", size = .35) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(1994, 2013, 4)) +
+  ylab("U Shear\n [m/s]") + xlab("Year") +
+  theme_minimal() +
+  ggtitle("D")
+
+p5 <- dfTA %>%
+  group_by(Yr) %>%
+  summarize(AnnualAvg = mean(mVSTM)) %>%
+ggplot(., aes(x = Yr, y = AnnualAvg)) +
+  geom_point() + geom_smooth(method = lm, color = "black", size = .35) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(1994, 2013, 4)) +
+  ylab("V Shear\n [m/s]") + xlab("Year") +
+  theme_minimal() +
+  ggtitle("E")
+
+p6 <- dfTA %>%
+  group_by(Yr) %>%
+  summarize(AnnualAvg = mean(mHLCY)) %>%
+ggplot(., aes(x = Yr, y = AnnualAvg)) +
+  geom_point() + geom_smooth(method = lm, color = "black", size = .35) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(1994, 2013, 4)) +
+  ylab("Helicity\n [J/kg]") + xlab("Year") +
+  theme_minimal() +
+  ggtitle("F")
+
+p1 + p2 + p3 + p4 + p5 + p6 + plot_layout(ncol = 2)
+```
+
+The surface temperature response to greenhouse gas forcing displays a pattern of polar-amplified warming1,2,3,4,5, particularly in the Northern Hemisphere. 
+
+1. Manabe, S. & Wetherald, R. The effects of doubling the CO2 concentrations on the climate of a general circulation model. J. Atmos. Sci. 32, 3–15 (1975).
+2. Holland, M. M. & Bitz, C. M. Polar amplification of climate change in coupled models. Clim. Dynam. 21, 221–232 (2003).
+3. Bintanja, R., Graversen, R. G. & Hazeleger, W. Arctic winter warming amplified by the thermal inversion and consequent low infrared cooling to space. Nat. Geosci. 4, 758–761 (2011).
+
+An increase in CAPE due to increased warming and moistening of the atmosphere and a decrease in shear throughout the midlatitudes from polar amplification of the warming.
+
+In contrast on big tornado days shear and CIN are increasing.
 
