@@ -542,13 +542,13 @@ ggplot(., aes(x = Yr, y = AnnualAvg)) +
 p1 + p2 + p3 + p4 + p5 + p6 + plot_layout(ncol = 2)
 ```
 
-The surface temperature response to greenhouse gas forcing displays a pattern of polar-amplified warming1,2,3,4,5, particularly in the Northern Hemisphere. 
+The surface temperature response to greenhouse gas forcing displays a pattern of polar-amplified warming (1,2,3) particularly in the Northern Hemisphere. 
 
 1. Manabe, S. & Wetherald, R. The effects of doubling the CO2 concentrations on the climate of a general circulation model. J. Atmos. Sci. 32, 3–15 (1975).
 2. Holland, M. M. & Bitz, C. M. Polar amplification of climate change in coupled models. Clim. Dynam. 21, 221–232 (2003).
 3. Bintanja, R., Graversen, R. G. & Hazeleger, W. Arctic winter warming amplified by the thermal inversion and consequent low infrared cooling to space. Nat. Geosci. 4, 758–761 (2011).
 
-An increase in CAPE due to increased warming and moistening of the atmosphere and a decrease in shear throughout the midlatitudes from polar amplification of the warming.
+We see an increase in CAPE due to increased warming and moistening of the atmosphere and a decrease in shear throughout the midlatitudes from polar amplification of the warming.
 
-In contrast on big tornado days shear and CIN are increasing.
+This is the changing background state. On big tornado days, shear is increasing and so is CIN.
 
